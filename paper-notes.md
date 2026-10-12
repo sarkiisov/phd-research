@@ -52,6 +52,37 @@
 - от t₀ до t₀ + T — клиенты переподключаются к новому экземпляру; старый дорабатывает начатые запросы и завершается досрочно, если все его соединения закрылись;
 - t₀ + T — принудительное завершение старого экземпляра; обслуживание незавершённых запросов прерывается.
 
+## Материал для раздела о стенде: модель нагрузки
+
+Согласованная формулировка абзаца (2026-10-11): «Генератор реализует открытую модель нагрузки, в которой клиенты отправляют запросы по собственному расписанию, независимо от ответов на предыдущие запросы [Schroeder et al., 2006; Kogias et al., 2019]. Такая модель соответствует сервису с большим числом независимых пользователей и, в отличие от закрытой модели, не занижает нагрузку в периоды, когда система отвечает медленнее [Schroeder et al., 2006]. Моменты отправки запросов образуют пуассоновский поток в соответствии с допущением модели.»
+
+Абзац обосновывает только выбор открытой модели. Ограничение про неравномерные потоки — в заключение, в направления развития модели.
+
+Источники (сверить по первоисточникам перед ссылкой):
+- Schroeder B., Wierman A., Harchol-Balter M. Open Versus Closed: A Cautionary Tale // NSDI 2006. https://www.usenix.org/legacy/event/nsdi06/tech/full_papers/schroeder/schroeder.pdf — основная ссылка об открытой и закрытой модели; более новой рецензируемой работы, заменяющей её, не найдено (поиск 2026-10-11).
+- Kogias M., Mallon S., Bugnion E. Lancet: A self-correcting Latency Measuring Tool // USENIX ATC 2019. https://www.usenix.org/system/files/atc19-kogias-lancet.pdf — открытый генератор как условие корректного измерения задержек.
+- Zhang Y. et al. Treadmill: Attributing the Source of Tail Latency through Precise Load Testing and Statistical Inference. https://www.researchgate.net/publication/309143207 — площадку и год сверить.
+
+## Будущая работа: влияние вида потока запросов
+
+Отложено до исследования, в котором будет учитываться влияние потоков (решение 2026-10-11).
+
+- **Факт:** реальные потоки запросов неравномернее пуассоновского — коэффициент вариации интервалов больше 1. Источники: BurstGPT (https://arxiv.org/html/2401.17644v4, интервалы описаны гамма-распределением), ServeGen 2025 (https://arxiv.org/pdf/2505.09999), A Year in LLM Serving 2026 (https://arxiv.org/pdf/2608.13573), FineServe (https://arxiv.org/pdf/2607.19349). Формулировка для текста: «неравномерные потоки, коэффициент вариации интервалов между запросами больше единицы» вместо разговорного «пачечный».
+- **Гипотеза:** средние значения в формулах (1)–(4) следуют из стационарности потока с интенсивностью λ и независимости длительностей от моментов поступления (закон Литтла, формула Кэмпбелла); пуассоновость определяет только распределение числа прерванных запросов, то есть разброс между заменами. Тонкость: модель считает долю как отношение средних, стенд — как среднее долей по заменам; при неравномерном потоке они могут различаться.
+- **Как проверять:** симуляция без стенда, затем при необходимости стенд с доработанным генератором. Кандидаты потоков: рекуррентный с гамма-интервалами (коэффициент вариации 2 и 4, как в BurstGPT) и марковский модулированный пуассоновский поток (MMPP) с режимами «спокойный» и «наплыв».
+- **Модели потоков** для справки: рекуррентный с гамма-интервалами, поток Эрланга, гиперэкспоненциальный, групповой пуассоновский, MMPP, MAP и BMAP (в русскоязычной литературе — работы А. Н. Дудина и В. И. Клименок, сверить), нестационарный пуассоновский, процесс Хоукса, самоподобный трафик.
+- **Отдельный случай:** замена в момент наплыва — не «произвольный момент», результат может отличаться.
+
+## Проверенные источники для введения (2026-10-11)
+
+- **Распространённость контейнеров.** Silverthorne V., Hendrick S. Cloud Native 2024: Approaching a Decade of Code, Cloud, and Change. The Linux Foundation, CNCF, March 2025. URL: https://www.cncf.io/wp-content/uploads/2025/04/cncf_annual_survey24_031225a.pdf. Цитата: «91% of organizations are using containers in production (used for most or for a few apps) compared to just 80% in 2023». Выборка 689 участников.
+- **Сетевые функции в контейнерах.** CNCF Telco Microsurvey: Cloud-native Network Functions with Kubernetes are coming, but interoperability and portability are priorities. CNCF, 2 August 2022. URL: https://www.cncf.io/blog/2022/08/02/cncf-telco-microsurvey-cloud-native-network-functions-with-kubernetes-are-coming-but-interoperability-and-portability-are-priorities/. «Three-quarters of respondents» переводят PNF или VNF в CNF; точнее, 52,38% переводят 76–100% функций и 23,81% переводят 50–75%, в сумме 76%. Проценты кратны 1/21, вероятно, на вопрос ответил 21 из 77 участников. Источник — запись в блоге CNCF, не рецензируемая работа.
+- **Горячий перезапуск Envoy не переносит соединения.** Envoy Proxy Documentation. Hot restart. URL: https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/operations/hot_restart. Цитата по сводке страницы: «Existing connections aren't transferred, so they must finish draining or be terminated»; процессы взаимодействуют только через доменные сокеты Unix; не поддерживается на Windows.
+- **Бесшовное обновление прокси в Facebook.** Naseer U., Niccolini L., Pant U., Frindell A., Dasineni R., Benson T. A. Zero Downtime Release: Disruption-free Load Balancing of a Multi-Billion User Website // Proceedings of ACM SIGCOMM 2020. P. 529–541. DOI: 10.1145/3387514.3405885. Передача соединений между процессами на одной машине.
+- **Цитаты из Naseer et al. (SIGCOMM 2020), на которых основан абзац о бесшовном обновлении:** «Today, the state of the art approach for deploying these code changes requires draining connections from servers with the old code and incrementally restarting the servers»; о языковой поддержке обновления: «this approach is not supported by most common languages… the effort required to rewrite our entire fleet of services in such a language is practically unrealistic»; о передаче соединений через ядро: ресурсы «prevents us from running both the new code and old code on the same server»; о собственном решении: «Our framework builds on several unique characteristics shared by the infrastructure of online service providers such as Facebook and Google»; миграция через корректное завершение требует поддержки протокола (GOAWAY в HTTP/2), которой нет у HTTP/1.1 и MQTT.
+- **Динамическое обновление ПО (научный термин для обновления без перезапуска).** Hicks M., Nettles S. Dynamic Software Updating // ACM Transactions on Programming Languages and Systems. 2005. Vol. 27, No. 6. P. 1049–1096.
+- **Программное омоложение (модели плановых перезапусков).** Huang Y., Kintala C., Kolettis N., Fulton N. D. Software Rejuvenation: Analysis, Module and Applications // Proceedings of the 25th International Symposium on Fault-Tolerant Computing (FTCS-25). 1995. P. 381–390. DOI: 10.1109/FTCS.1995.466961.
+
 ## Задачи для введения
 
 - **Подтвердить, что сетевые функции всё чаще разворачивают в контейнерах.** Кандидаты: ежегодные опросы CNCF (доля организаций с контейнерами в производственной среде), отчёты Datadog о контейнерах, число скачиваний образа `envoyproxy/envoy` на Docker Hub, научные обзоры по контейнеризации сетевых функций. Без источника утверждение во введение не вносить.
