@@ -1,0 +1,16 @@
+# Результаты прогонов стенда (сырые журналы, отчёты)
+results/
+stand/results/
+# Python
+__pycache__/
+*.pyc
+.venv/
+stand/.venv/
+*.egg-info/
+.pytest_cache/
+# Сырые трассы открытых наборов данных (большие архивы, хранятся вне git)
+data/
+# Файлы длительностей контрольной серии (строятся paper2/analysis/profiles/make_duration_files.py)
+stand/durations/
+paper2/analysis/llm_replay/_segments.pkl
+paper2/analysis/llm_replay/_results.pkl
